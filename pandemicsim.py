@@ -6,21 +6,13 @@ import random
 import pygame
 from dataclasses import dataclass
 
-# ----------------------------
-# PyInstaller helper
-# ----------------------------
+
+
 def resource_path(relative_path: str) -> str:
-    """
-    Get absolute path to resource, works for dev and for PyInstaller.
-    PyInstaller extracts files to a temp folder stored in sys._MEIPASS.
-    """
     base_path = getattr(sys, "_MEIPASS", os.path.abspath("."))
     return os.path.join(base_path, relative_path)
 
 
-# ----------------------------
-# Config
-# ----------------------------
 WIDTH, HEIGHT = 1280, 720
 FPS = 60
 
@@ -42,13 +34,9 @@ RIGHT_RECT = pygame.Rect(880, 90, 370, 580)
 MAX_DAYS = 365
 DAY_SECONDS_BASE = 0.85
 
-# MUST match your filename exactly:
 GEOJSON_FILENAME = "ne_110m_admin_0_countries.geojson"
 
 
-# ----------------------------
-# Helpers
-# ----------------------------
 def clamp(x, a, b):
     return max(a, min(b, x))
 
@@ -114,9 +102,7 @@ def tooltip(surf, x, y, lines, font):
         yy += r.get_height()
 
 
-# ----------------------------
-# UI widgets
-# ----------------------------
+
 class Button:
     def __init__(self, rect, label, font):
         self.rect = pygame.Rect(rect)
@@ -224,9 +210,6 @@ class TextBox:
         draw_text(surf, label, self.font, WHITE, (self.rect.centerx, self.rect.y - 6), align="midbottom")
 
 
-# ----------------------------
-# Virus Parts
-# ----------------------------
 @dataclass
 class Part:
     name: str
@@ -314,10 +297,6 @@ def apply_mods(p, mods):
     p["vax_effect"] = clamp(p["vax_effect"], 0.0, 0.95)
     return p
 
-
-# ----------------------------
-# Country data from GeoJSON
-# ----------------------------
 LANDLOCKED = {
     "Afghanistan","Andorra","Armenia","Austria","Azerbaijan","Belarus","Bhutan","Bolivia","Botswana","Burkina Faso",
     "Burundi","Central African Republic","Chad","Czechia","Eswatini","Ethiopia","Hungary","Kazakhstan","Kosovo",
@@ -331,9 +310,9 @@ class CountryGeom:
     name: str
     pop: int
     coastal: bool
-    polys: list        # list[list[(x,y)]]
-    bboxes: list       # list[(x0,y0,x1,y1)]
-    centroid: tuple    # (x,y)
+    polys: list
+    bboxes: list
+    centroid: tuple
 
 def load_countries(geojson_path, rect):
     if not os.path.exists(geojson_path):
@@ -371,7 +350,13 @@ def load_countries(geojson_path, rect):
                 x, y = project_latlon(lat, lon, inner)
                 pts.append((x, y))
 
-            # aggressive downsample for speed
+            if len(pts) > 700:
+                step = max(1, len(pts) // 350)
+                pts = pts[::step]
+            elif len(pts) > 350:
+                x, y = project_latlon(lat, lon, inner)
+                pts.append((x, y))
+
             if len(pts) > 700:
                 step = max(1, len(pts) // 350)
                 pts = pts[::step]
@@ -412,9 +397,6 @@ def load_countries(geojson_path, rect):
     return out
 
 
-# ----------------------------
-# Simulation visuals
-# ----------------------------
 class TravelParticle:
     def __init__(self, a, b, color, duration=0.9):
         self.ax, self.ay = a
@@ -452,9 +434,6 @@ class Pulse:
         surf.blit(s, (self.x - s.get_width()//2, self.y - s.get_height()//2))
 
 
-# ----------------------------
-# World Simulation
-# ----------------------------
 class WorldSim:
     def __init__(self, params, countries, start_name, flights_on, boats_on):
         self.params = params
@@ -480,7 +459,6 @@ class WorldSim:
         self.S[start_idx] -= seed
         self.I[start_idx] += seed
 
-        # Neighbor graph
         self.neigh = [[] for _ in range(n)]
         for i in range(n):
             ax, ay = countries[i].centroid
@@ -525,7 +503,6 @@ class WorldSim:
 
         n = len(self.countries)
 
-        # vaccinate
         if vax_rate > 0:
             for k in range(n):
                 if self.S[k] <= 0:
@@ -535,7 +512,6 @@ class WorldSim:
                 self.S[k] -= vacc
                 self.V[k] += vacc
 
-        # within-country infection
         for k in range(n):
             alive = self.S[k] + self.I[k] + self.R[k] + self.V[k]
             if alive <= 0 or self.I[k] <= 0 or self.S[k] <= 0:
@@ -554,7 +530,6 @@ class WorldSim:
                 if random.random() < 0.18:
                     self.pulses.append(Pulse(self.countries[k].centroid, RED))
 
-        # neighbor spread
         for k in range(n):
             if self.I[k] <= 0:
                 continue
@@ -569,7 +544,6 @@ class WorldSim:
                     if random.random() < 0.08:
                         self.pulses.append(Pulse(self.countries[nb].centroid, RED))
 
-        # travel spread
         if self.flights_on or self.boats_on:
             _, I_tot, _, _, _ = self.totals()
             travel_base = clamp(I_tot / 60_000_000, 0.0, 1.0)
@@ -602,7 +576,6 @@ class WorldSim:
                                 self.travel.append(TravelParticle(self.countries[k].centroid, self.countries[j].centroid, (120, 255, 190), 1.05))
                                 self.pulses.append(Pulse(self.countries[j].centroid, RED))
 
-        # recovery/death
         for k in range(n):
             if self.I[k] <= 0:
                 continue
@@ -650,9 +623,6 @@ class WorldSim:
         return wiped, infection_gone, timed_out
 
 
-# ----------------------------
-# Map rendering + speed structures
-# ----------------------------
 def render_base_map_surface(countries):
     surf = pygame.Surface((WORLD_RECT.w, WORLD_RECT.h), pygame.SRCALPHA)
     surf.fill((0, 0, 0, 0))
@@ -733,9 +703,6 @@ def build_country_masks(countries):
     return masks
 
 
-# ----------------------------
-# Stats UI
-# ----------------------------
 def draw_bar(surf, x, y, w, h, frac, label, value, font):
     pygame.draw.rect(surf, (30, 35, 48), (x, y, w, h), border_radius=8)
     pygame.draw.rect(surf, (80, 90, 120), (x, y, w, h), 2, border_radius=8)
@@ -780,7 +747,6 @@ def draw_stats(surf, sim, font, font_small, paused, hovered_idx=None):
     draw_bar(surf, bx, y0 + 60, bw, 22, (recovery - 3) / 25, "Recovery time (days)", f"{recovery:.1f}", font_small)
     draw_bar(surf, bx, y0 + 120, bw, 22, vacc_pct, "Vaccination % (current)", f"{vacc_pct*100:.1f}%", font_small)
 
-    # Top infected countries list (THIS fixes “I can’t see which country is infected”)
     list_top = RIGHT_RECT.top + 455
     draw_text(surf, "Top infected countries:", font_small, WHITE, (RIGHT_RECT.centerx, list_top), align="center")
 
@@ -798,7 +764,6 @@ def draw_stats(surf, sim, font, font_small, paused, hovered_idx=None):
             pct = (infected / alive_c * 100) if alive_c else 0.0
 
             name = c.name
-            # shorten long names a bit so it fits nicely
             if len(name) > 22:
                 name = name[:21] + "…"
 
@@ -813,9 +778,6 @@ def draw_stats(surf, sim, font, font_small, paused, hovered_idx=None):
               (RIGHT_RECT.centerx, RIGHT_RECT.bottom - 22), align="center")
 
 
-# ----------------------------
-# Main
-# ----------------------------
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -826,7 +788,6 @@ def main():
     font = pygame.font.SysFont("consolas", 22, bold=True)
     font_small = pygame.font.SysFont("consolas", 16)
 
-    # Load countries (IMPORTANT: use resource_path so PyInstaller works)
     try:
         geojson_path = resource_path(GEOJSON_FILENAME)
         countries = load_countries(geojson_path, WORLD_RECT)
@@ -948,7 +909,6 @@ def main():
 
             elif scene == "gameover":
                 if restart_btn.clicked(event, enabled=True):
-                    # IMPORTANT: mutate list, don’t rebind (prevents subtle bugs)
                     selected[:] = [None, None, None, None]
                     chosen = default_start
                     country_box.text = chosen
@@ -1044,7 +1004,6 @@ def main():
             mx, my = pygame.mouse.get_pos()
             hovered = pick_hovered_country(sim, hover_grid, cols, rows, cell, mx, my)
 
-            # Infection overlays: show even small infections
             for idx, c in enumerate(sim.countries):
                 I = sim.I[idx]
                 if I <= 0:
@@ -1056,9 +1015,8 @@ def main():
 
                 inf_frac = I / alive
 
-                # make small infections still visible: sqrt gives more pop at low values
                 strength = clamp(math.sqrt(inf_frac) * 3.0, 0.0, 1.0)
-                alpha = int(30 + 190 * strength)  # min alpha makes it visible
+                alpha = int(30 + 190 * strength)
 
                 if abs(alpha - overlay_alpha_last[idx]) >= 6 or overlay_cache[idx] is None:
                     overlay_alpha_last[idx] = alpha
@@ -1077,7 +1035,6 @@ def main():
             for p in sim.pulses:
                 p.draw(screen)
 
-            # Clean legend that fits (2 lines, inside a box)
             leg_text1 = "Green = healthy land"
             leg_text2 = "More red = more infected"
             tw1 = font_small.size(leg_text1)[0]
