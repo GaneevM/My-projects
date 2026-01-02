@@ -6,7 +6,6 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import re
 
 def translate_function(func):
-    """Translate user-friendly math into valid Python syntax."""
     func = func.replace('^', '**')
     func = re.sub(r'\b(sin|cos|tan|exp|log|sqrt)\b', r'np.\1', func)
     func = re.sub(r'(\d)(x)', r'\1*\2', func)
@@ -22,25 +21,19 @@ class GraphingCalc:
         self.root.title("Ganeev's graphing calculator")
         self.root.geometry("1100x700") 
 
-        # Data storage
-        self.saved_graphs = [] # List of dicts: {"expression": str, "visible": Var, "color": str}
+        self.saved_graphs = []
         self.colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
         
-        # --- UI LAYOUT ---
-        # Main container
         self.main_frame = tk.Frame(root)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Left Sidebar for Desmos-style list
         self.sidebar = tk.LabelFrame(self.main_frame, text="Functions", width=250, padx=5, pady=5)
         self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
         self.sidebar.pack_propagate(False)
 
-        # Right side for Plotting
         self.plot_container = tk.Frame(self.main_frame)
         self.plot_container.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        # --- Top Controls ---
         self.controls = tk.Frame(self.plot_container)
         self.controls.pack(side=tk.TOP, fill=tk.X)
 
@@ -60,17 +53,14 @@ class GraphingCalc:
 
         tk.Button(self.controls, text="Add Graph", width=10, command=self.add_graph).grid(row=1, column=4, padx=5)
 
-        # --- Calculator Buttons ---
         self.calc_frame = tk.Frame(self.controls)
         self.calc_frame.grid(row=2, column=0, columnspan=5)
         self.setup_buttons()
 
-        # --- Matplotlib Figure ---
         self.fig, self.ax = plt.subplots(figsize=(5, 4))
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_container)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         
-        # Toolbar for zooming
         self.toolbar = NavigationToolbar2Tk(self.canvas, self.plot_container)
         self.toolbar.update()
 
@@ -100,24 +90,17 @@ class GraphingCalc:
         expr = self.entry_func.get()
         if not expr: return
         
-        # --- NEW ERROR CHECK ---
-        # Before adding, we try to evaluate it with a test value (x=1)
-        # If this fails, we alert the user immediately.
         try:
             test_x = 1.0
             test_func = translate_function(expr)
-            # Try to calculate it; if expr is "2..x" or "sinn(x)", this will crash
             eval(test_func, {"x": test_x, "np": np})
         except Exception:
             messagebox.showerror("Parsing Error", "Could not understand input.\nPlease fix input.")
             return
-        # -----------------------
 
-        # Assign color and visibility variable
         color = self.colors[len(self.saved_graphs) % len(self.colors)]
         visible_var = tk.BooleanVar(value=True)
         
-        # Create Sidebar Toggle
         chk = tk.Checkbutton(self.sidebar, text=f"y = {expr}", variable=visible_var, 
                              fg=color, font=("Arial", 10, "bold"), command=self.update_plot)
         chk.pack(anchor='w')
@@ -136,7 +119,6 @@ class GraphingCalc:
             
         x = np.linspace(x_min, x_max, 2000)
 
-        # --- RE-APPLY WATERMARK ---
         self.fig.texts = [] 
         self.fig.text(0.5, 0.5, "Ganeev's graphing calc", 
                  fontsize=35, color='gray', ha='center', va='center', 
@@ -149,9 +131,8 @@ class GraphingCalc:
                     y = eval(func_translated, {"x": x, "np": np})
                     y = np.where(np.abs(y) > 20, np.nan, y)
                     self.ax.plot(x, y, label=f"y={graph['expr']}", color=graph['color'], linewidth=2)
-                except Exception as e:
-                    # Silent fail here, as we caught the big errors in add_graph
-                    print(f"Error plotting {graph['expr']}: {e}")
+                except Exception:
+                    pass
 
         self.ax.set_xlabel("x")
         self.ax.set_ylabel("y")
