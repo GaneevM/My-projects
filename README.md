@@ -8,7 +8,7 @@ This is an interactive chem-lab game where you drag elements from the periodic t
 Source code is in alchemy.py  
 
 ## Battle Bot Simulator
-This is a simple battle simulation where robots fight each other based on your decision of parts and their individual behaviors that the users or AI controls. I made this to experiment with game logic and how different parts of machines work together to be work better.
+This is a simple battle simulation where robots fight each other based on your decision of parts and their individual behaviors that the users or AI controls. I made this to experiment with game logic and with different machine parts. It teaches users engineering skills.
 
 Source code is in battlebotsim.py  
 
